@@ -6,6 +6,7 @@
   :repositories {"my.datomic.com" {:url "https://my.datomic.com/repo"
                                    :creds :gpg}}
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [com.datomic/datomic-pro "0.9.5561.56"]]
+                 [com.datomic/datomic-pro "0.9.5561.56"]
+                 [com.datomic/clj-client "0.8.606"]]
 
   :plugins [[lein-gorilla "0.4.0"]])
