@@ -9,7 +9,7 @@
 
 ;; @@
 (ns datomic-doc.peer-getting-started
-  (:require	[datomic.api :as d]))
+  (:require [datomic.api :as d]))
 ;; @@
 ;; =>
 ;;; {"type":"html","content":"<span class='clj-nil'>nil</span>","value":"nil"}
@@ -92,19 +92,23 @@
 ;;; ## Query data
 ;; **
 
-;; @@
-;; retrieve the current database value and store it in a var
-;; 'db' is a snaptiona as of a point in time: immutability
+;; **
+;;; * Retrieve the current database value and store it in a var
+;;; * 'db' is a snaptiona as of a point in time: immutability
+;; **
 
+;; @@
 (def db (d/db conn)) 
 ;; @@
 ;; =>
 ;;; {"type":"html","content":"<span class='clj-var'>#&#x27;datomic-doc.peer-getting-started/db</span>","value":"#'datomic-doc.peer-getting-started/db"}
 ;; <=
 
-;; @@
-;; find entities with a :movie/title
+;; **
+;;; * Find entities with a :movie/title
+;; **
 
+;; @@
 (def all-movies-q '[:find ?e :where [?e :movie/title]])
 (d/q all-movies-q db)
 ;; @@
@@ -112,9 +116,11 @@
 ;;; {"type":"html","content":"<span class='clj-unkown'>#{[17592186045418] [17592186045419] [17592186045420]}</span>","value":"#{[17592186045418] [17592186045419] [17592186045420]}"}
 ;; <=
 
-;; @@
-;; find all the titles of all the movies
+;; **
+;;; * Find all the titles of all the movies
+;; **
 
+;; @@
 (def all-titles-q '[:find ?movie-title :where [_ :movie/title ?movie-title]])
 (d/q all-titles-q db)
 ;; @@
@@ -122,9 +128,11 @@
 ;;; {"type":"html","content":"<span class='clj-unkown'>#{[&quot;Commando&quot;] [&quot;The Goonies&quot;] [&quot;Repo Man&quot;]}</span>","value":"#{[\"Commando\"] [\"The Goonies\"] [\"Repo Man\"]}"}
 ;; <=
 
-;; @@
-;; find the titles of movies released in 1985
+;; **
+;;; * Find the titles of movies released in 1985
+;; **
 
+;; @@
 (def titles-from-1985 '[:find ?title :where [?e :movie/title ?title]
                                             [?e :movie/release-year 1985]])
 (d/q titles-from-1985 db)
@@ -133,9 +141,11 @@
 ;;; {"type":"html","content":"<span class='clj-unkown'>#{[&quot;Commando&quot;] [&quot;The Goonies&quot;]}</span>","value":"#{[\"Commando\"] [\"The Goonies\"]}"}
 ;; <=
 
-;; @@
-;; return all the attributes for each movies release in 1985
+;; **
+;;; * Return all the attributes for each movies release in 1985
+;; **
 
+;; @@
 (def all-data-from-1985 '[:find ?e ?title ?year ?genre
                           :where [?e :movie/title ?title]
                                  [?e :movie/release-year ?year]
@@ -151,72 +161,88 @@
 ;;; ## History of values in the database
 ;; **
 
-;; @@
-;; bind the entity id of Commando to a local variable
+;; **
+;;; * Bind the entity id of Commando to a local variable
+;; **
 
+;; @@
 (def command-id (ffirst (d/q '[:find ?e :where [?e :movie/title "Commando"]] db)))
 ;; @@
 ;; =>
 ;;; {"type":"html","content":"<span class='clj-var'>#&#x27;datomic-doc.peer-getting-started/command-id</span>","value":"#'datomic-doc.peer-getting-started/command-id"}
 ;; <=
 
-;; @@
-;; issue a trasaction to change the data
+;; **
+;;; * Issue a trasaction to change the data
+;; **
 
+;; @@
 (d/transact conn [{:db/id command-id :movie/genre "future governor"}])
 ;; @@
 ;; =>
 ;;; {"type":"html","content":"<span class='clj-unkown'>#object[datomic.promise$settable_future$reify__6317 0x2016887c {:status :ready, :val {:db-before datomic.db.Db@162a2a74, :db-after datomic.db.Db@98781bb1, :tx-data [#datom[13194139534319 50 #inst &quot;2017-08-27T12:52:27.756-00:00&quot; 13194139534319 true]], :tempids {}}}]</span>","value":"#object[datomic.promise$settable_future$reify__6317 0x2016887c {:status :ready, :val {:db-before datomic.db.Db@162a2a74, :db-after datomic.db.Db@98781bb1, :tx-data [#datom[13194139534319 50 #inst \"2017-08-27T12:52:27.756-00:00\" 13194139534319 true]], :tempids {}}}]"}
 ;; <=
 
-;; @@
-;; get a current value of the database
+;; **
+;;; * Get a current value of the database
+;; **
 
+;; @@
 (def db (d/db conn))
 ;; @@
 ;; =>
 ;;; {"type":"html","content":"<span class='clj-var'>#&#x27;datomic-doc.peer-getting-started/db</span>","value":"#'datomic-doc.peer-getting-started/db"}
 ;; <=
 
-;; @@
-;; verify that Commando has been updated
+;; **
+;;; * Verify that Commando has been updated
+;; **
 
+;; @@
 (d/q all-data-from-1985 db)
 ;; @@
 ;; =>
 ;;; {"type":"html","content":"<span class='clj-unkown'>#{[17592186045419 &quot;Commando&quot; 1985 &quot;future governor&quot;] [17592186045418 &quot;The Goonies&quot; 1985 &quot;action/adventure&quot;]}</span>","value":"#{[17592186045419 \"Commando\" 1985 \"future governor\"] [17592186045418 \"The Goonies\" 1985 \"action/adventure\"]}"}
 ;; <=
 
-;; @@
-;; take a database value of a 'db-before'
+;; **
+;;; * Take a database value of a 'db-before'
+;; **
 
+;; @@
 (def old-db (d/as-of db 13194139534313))
 ;; @@
 ;; =>
 ;;; {"type":"html","content":"<span class='clj-var'>#&#x27;datomic-doc.peer-getting-started/old-db</span>","value":"#'datomic-doc.peer-getting-started/old-db"}
 ;; <=
 
-;; @@
-;; issue the same query against 'db-before'
+;; **
+;;; * Issue the same query against 'db-before'
+;; **
 
+;; @@
 (d/q all-data-from-1985 old-db)
 ;; @@
 ;; =>
 ;;; {"type":"html","content":"<span class='clj-unkown'>#{[17592186045419 &quot;Commando&quot; 1985 &quot;action/adventure&quot;] [17592186045418 &quot;The Goonies&quot; 1985 &quot;action/adventure&quot;]}</span>","value":"#{[17592186045419 \"Commando\" 1985 \"action/adventure\"] [17592186045418 \"The Goonies\" 1985 \"action/adventure\"]}"}
 ;; <=
 
-;; @@
-;; call history on the existing database value
+;; **
+;;; * Call history on the existing database value
+;; **
 
+;; @@
 (def hdb (d/history db))
 ;; @@
 ;; =>
 ;;; {"type":"html","content":"<span class='clj-var'>#&#x27;datomic-doc.peer-getting-started/hdb</span>","value":"#'datomic-doc.peer-getting-started/hdb"}
 ;; <=
 
-;; @@
-;; query against hdb
+;; **
+;;; * Query against hdb
+;; **
 
+;; @@
 (d/q '[:find ?genre
        :where [?e :movie/title "Commando"]
               [?e :movie/genre ?genre]] hdb)
