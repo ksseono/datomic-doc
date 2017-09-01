@@ -232,6 +232,155 @@ sample-data
 ;;; ## Read (revisited: more query)
 ;; **
 
+;; **
+;;; * Acquire the latest value of the database
+;; **
+
+;; @@
+(def db (client/db conn))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;datomic-doc.tutorial/db</span>","value":"#'datomic-doc.tutorial/db"}
+;; <=
+
+;; **
+;;; * Parameterized Query: *finds all the other items that have ever appeared in the same order.*
+;; **
+
+;; @@
+(<!! (client/q
+       conn
+       {:query '[:find ?sku
+                 :in $ ?inv
+                 :where
+                 [?item :item/id ?inv]
+                 [?order :order/items ?item]
+                 [?order :order/items ?other-item]
+                 [?other-item :item/id ?other-inv]
+                 [?other-inv :inv/sku ?sku]]
+        :args [db [:inv/sku "SKU-25"]]}))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-string'>&quot;SKU-25&quot;</span>","value":"\"SKU-25\""}],"value":"[\"SKU-25\"]"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-string'>&quot;SKU-26&quot;</span>","value":"\"SKU-26\""}],"value":"[\"SKU-26\"]"}],"value":"[[\"SKU-25\"] [\"SKU-26\"]]"}
+;; <=
+
+;; **
+;;; * Rules: *Create a rule named ordered-together that binds two variables `?inv` and `?other-inv` if they have ever appeared in the same order*
+;; **
+
+;; @@
+(def rules
+  '[[(ordered-together ?inv ?other-inv)
+     [?item :item/id ?inv]
+     [?order :order/items ?item]
+     [?order :order/items ?other-item]
+     [?other-item :item/id ?other-inv]]])
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;datomic-doc.tutorial/rules</span>","value":"#'datomic-doc.tutorial/rules"}
+;; <=
+
+;; **
+;;; * Pass these rules to a query, using the special `:in name %`
+;; **
+
+;; @@
+(<!! (client/q
+       conn
+       {:query '[:find ?sku
+                 :in $ % ?inv
+                 :where
+                 (ordered-together ?inv ?other-inv)
+                 [?other-inv :inv/sku ?sku]]
+        :args [db rules [:inv/sku "SKU-25"]]}))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-string'>&quot;SKU-25&quot;</span>","value":"\"SKU-25\""}],"value":"[\"SKU-25\"]"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-string'>&quot;SKU-26&quot;</span>","value":"\"SKU-26\""}],"value":"[\"SKU-26\"]"}],"value":"[[\"SKU-25\"] [\"SKU-26\"]]"}
+;; <=
+
+;; **
+;;; ## Retract
+;; **
+
+;; **
+;;; * Add a schema to keep a count of items in inventory
+;; **
+
+;; @@
+(def inventory-counts
+  [{:db/ident :inv/count
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one}])
+
+(<!! (client/transact conn {:tx-data inventory-counts}))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:db-before</span>","value":":db-before"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:database-id</span>","value":":database-id"},{"type":"html","content":"<span class='clj-string'>&quot;59a7a209-5623-4172-90c1-f81af1de1cd8&quot;</span>","value":"\"59a7a209-5623-4172-90c1-f81af1de1cd8\""}],"value":"[:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\"]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:t</span>","value":":t"},{"type":"html","content":"<span class='clj-long'>1282</span>","value":"1282"}],"value":"[:t 1282]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:next-t</span>","value":":next-t"},{"type":"html","content":"<span class='clj-long'>1286</span>","value":"1286"}],"value":"[:next-t 1286]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:history</span>","value":":history"},{"type":"html","content":"<span class='clj-unkown'>false</span>","value":"false"}],"value":"[:history false]"}],"value":"{:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1282, :next-t 1286, :history false}"}],"value":"[:db-before {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1282, :next-t 1286, :history false}]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:db-after</span>","value":":db-after"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:database-id</span>","value":":database-id"},{"type":"html","content":"<span class='clj-string'>&quot;59a7a209-5623-4172-90c1-f81af1de1cd8&quot;</span>","value":"\"59a7a209-5623-4172-90c1-f81af1de1cd8\""}],"value":"[:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\"]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:t</span>","value":":t"},{"type":"html","content":"<span class='clj-long'>1286</span>","value":"1286"}],"value":"[:t 1286]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:next-t</span>","value":":next-t"},{"type":"html","content":"<span class='clj-long'>1287</span>","value":"1287"}],"value":"[:next-t 1287]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:history</span>","value":":history"},{"type":"html","content":"<span class='clj-unkown'>false</span>","value":"false"}],"value":"[:history false]"}],"value":"{:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1286, :next-t 1287, :history false}"}],"value":"[:db-after {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1286, :next-t 1287, :history false}]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:tx-data</span>","value":":tx-data"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-unkown'>#datom[13194139534598 50 #inst &quot;2017-09-01T06:57:02.957-00:00&quot; 13194139534598 true]</span>","value":"#datom[13194139534598 50 #inst \"2017-09-01T06:57:02.957-00:00\" 13194139534598 true]"},{"type":"html","content":"<span class='clj-unkown'>#datom[70 10 :inv/count 13194139534598 true]</span>","value":"#datom[70 10 :inv/count 13194139534598 true]"},{"type":"html","content":"<span class='clj-unkown'>#datom[70 40 22 13194139534598 true]</span>","value":"#datom[70 40 22 13194139534598 true]"},{"type":"html","content":"<span class='clj-unkown'>#datom[70 41 35 13194139534598 true]</span>","value":"#datom[70 41 35 13194139534598 true]"},{"type":"html","content":"<span class='clj-unkown'>#datom[0 13 70 13194139534598 true]</span>","value":"#datom[0 13 70 13194139534598 true]"}],"value":"[#datom[13194139534598 50 #inst \"2017-09-01T06:57:02.957-00:00\" 13194139534598 true] #datom[70 10 :inv/count 13194139534598 true] #datom[70 40 22 13194139534598 true] #datom[70 41 35 13194139534598 true] #datom[0 13 70 13194139534598 true]]"}],"value":"[:tx-data [#datom[13194139534598 50 #inst \"2017-09-01T06:57:02.957-00:00\" 13194139534598 true] #datom[70 10 :inv/count 13194139534598 true] #datom[70 40 22 13194139534598 true] #datom[70 41 35 13194139534598 true] #datom[0 13 70 13194139534598 true]]]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:tempids</span>","value":":tempids"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>-9223301668109597846</span>","value":"-9223301668109597846"},{"type":"html","content":"<span class='clj-long'>70</span>","value":"70"}],"value":"[-9223301668109597846 70]"}],"value":"{-9223301668109597846 70}"}],"value":"[:tempids {-9223301668109597846 70}]"}],"value":"{:db-before {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1282, :next-t 1286, :history false}, :db-after {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1286, :next-t 1287, :history false}, :tx-data [#datom[13194139534598 50 #inst \"2017-09-01T06:57:02.957-00:00\" 13194139534598 true] #datom[70 10 :inv/count 13194139534598 true] #datom[70 40 22 13194139534598 true] #datom[70 41 35 13194139534598 true] #datom[0 13 70 13194139534598 true]], :tempids {-9223301668109597846 70}}"}
+;; <=
+
+;; **
+;;; * Assert the items with mistakes
+;; **
+
+;; @@
+(def inventory-update
+  [[:db/add [:inv/sku "SKU-21"] :inv/count 7]
+   [:db/add [:inv/sku "SKU-22"] :inv/count 7]
+   [:db/add [:inv/sku "SKU-42"] :inv/count 100]])
+
+(<!! (client/transact conn {:tx-data inventory-update}))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:db-before</span>","value":":db-before"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:database-id</span>","value":":database-id"},{"type":"html","content":"<span class='clj-string'>&quot;59a7a209-5623-4172-90c1-f81af1de1cd8&quot;</span>","value":"\"59a7a209-5623-4172-90c1-f81af1de1cd8\""}],"value":"[:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\"]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:t</span>","value":":t"},{"type":"html","content":"<span class='clj-long'>1287</span>","value":"1287"}],"value":"[:t 1287]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:next-t</span>","value":":next-t"},{"type":"html","content":"<span class='clj-long'>1288</span>","value":"1288"}],"value":"[:next-t 1288]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:history</span>","value":":history"},{"type":"html","content":"<span class='clj-unkown'>false</span>","value":"false"}],"value":"[:history false]"}],"value":"{:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1287, :next-t 1288, :history false}"}],"value":"[:db-before {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1287, :next-t 1288, :history false}]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:db-after</span>","value":":db-after"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:database-id</span>","value":":database-id"},{"type":"html","content":"<span class='clj-string'>&quot;59a7a209-5623-4172-90c1-f81af1de1cd8&quot;</span>","value":"\"59a7a209-5623-4172-90c1-f81af1de1cd8\""}],"value":"[:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\"]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:t</span>","value":":t"},{"type":"html","content":"<span class='clj-long'>1288</span>","value":"1288"}],"value":"[:t 1288]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:next-t</span>","value":":next-t"},{"type":"html","content":"<span class='clj-long'>1289</span>","value":"1289"}],"value":"[:next-t 1289]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:history</span>","value":":history"},{"type":"html","content":"<span class='clj-unkown'>false</span>","value":"false"}],"value":"[:history false]"}],"value":"{:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1288, :next-t 1289, :history false}"}],"value":"[:db-after {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1288, :next-t 1289, :history false}]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:tx-data</span>","value":":tx-data"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-unkown'>#datom[13194139534600 50 #inst &quot;2017-09-01T07:00:52.231-00:00&quot; 13194139534600 true]</span>","value":"#datom[13194139534600 50 #inst \"2017-09-01T07:00:52.231-00:00\" 13194139534600 true]"},{"type":"html","content":"<span class='clj-unkown'>#datom[17592186045654 70 7 13194139534600 true]</span>","value":"#datom[17592186045654 70 7 13194139534600 true]"},{"type":"html","content":"<span class='clj-unkown'>#datom[17592186045655 70 7 13194139534600 true]</span>","value":"#datom[17592186045655 70 7 13194139534600 true]"},{"type":"html","content":"<span class='clj-unkown'>#datom[17592186045675 70 100 13194139534600 true]</span>","value":"#datom[17592186045675 70 100 13194139534600 true]"}],"value":"[#datom[13194139534600 50 #inst \"2017-09-01T07:00:52.231-00:00\" 13194139534600 true] #datom[17592186045654 70 7 13194139534600 true] #datom[17592186045655 70 7 13194139534600 true] #datom[17592186045675 70 100 13194139534600 true]]"}],"value":"[:tx-data [#datom[13194139534600 50 #inst \"2017-09-01T07:00:52.231-00:00\" 13194139534600 true] #datom[17592186045654 70 7 13194139534600 true] #datom[17592186045655 70 7 13194139534600 true] #datom[17592186045675 70 100 13194139534600 true]]]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:tempids</span>","value":":tempids"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[],"value":"{}"}],"value":"[:tempids {}]"}],"value":"{:db-before {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1287, :next-t 1288, :history false}, :db-after {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1288, :next-t 1289, :history false}, :tx-data [#datom[13194139534600 50 #inst \"2017-09-01T07:00:52.231-00:00\" 13194139534600 true] #datom[17592186045654 70 7 13194139534600 true] #datom[17592186045655 70 7 13194139534600 true] #datom[17592186045675 70 100 13194139534600 true]], :tempids {}}"}
+;; <=
+
+;; **
+;;; * Explicit Retract: *fix `SKU-22` with a retraction, which cancels the effect of an assertion*
+;; **
+
+;; @@
+(<!! (client/transact
+       conn
+       {:tx-data [[:db/retract [:inv/sku "SKU-22"] :inv/count 7]
+                  [:db/add "datomic.tx" :db/doc "remove incorrect assertion"]]}))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:db-before</span>","value":":db-before"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:database-id</span>","value":":database-id"},{"type":"html","content":"<span class='clj-string'>&quot;59a7a209-5623-4172-90c1-f81af1de1cd8&quot;</span>","value":"\"59a7a209-5623-4172-90c1-f81af1de1cd8\""}],"value":"[:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\"]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:t</span>","value":":t"},{"type":"html","content":"<span class='clj-long'>1288</span>","value":"1288"}],"value":"[:t 1288]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:next-t</span>","value":":next-t"},{"type":"html","content":"<span class='clj-long'>1289</span>","value":"1289"}],"value":"[:next-t 1289]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:history</span>","value":":history"},{"type":"html","content":"<span class='clj-unkown'>false</span>","value":"false"}],"value":"[:history false]"}],"value":"{:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1288, :next-t 1289, :history false}"}],"value":"[:db-before {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1288, :next-t 1289, :history false}]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:db-after</span>","value":":db-after"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:database-id</span>","value":":database-id"},{"type":"html","content":"<span class='clj-string'>&quot;59a7a209-5623-4172-90c1-f81af1de1cd8&quot;</span>","value":"\"59a7a209-5623-4172-90c1-f81af1de1cd8\""}],"value":"[:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\"]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:t</span>","value":":t"},{"type":"html","content":"<span class='clj-long'>1289</span>","value":"1289"}],"value":"[:t 1289]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:next-t</span>","value":":next-t"},{"type":"html","content":"<span class='clj-long'>1290</span>","value":"1290"}],"value":"[:next-t 1290]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:history</span>","value":":history"},{"type":"html","content":"<span class='clj-unkown'>false</span>","value":"false"}],"value":"[:history false]"}],"value":"{:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1289, :next-t 1290, :history false}"}],"value":"[:db-after {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1289, :next-t 1290, :history false}]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:tx-data</span>","value":":tx-data"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-unkown'>#datom[13194139534601 50 #inst &quot;2017-09-01T07:03:48.978-00:00&quot; 13194139534601 true]</span>","value":"#datom[13194139534601 50 #inst \"2017-09-01T07:03:48.978-00:00\" 13194139534601 true]"},{"type":"html","content":"<span class='clj-unkown'>#datom[17592186045655 70 7 13194139534601 false]</span>","value":"#datom[17592186045655 70 7 13194139534601 false]"},{"type":"html","content":"<span class='clj-unkown'>#datom[13194139534601 62 &quot;remove incorrect assertion&quot; 13194139534601 true]</span>","value":"#datom[13194139534601 62 \"remove incorrect assertion\" 13194139534601 true]"}],"value":"[#datom[13194139534601 50 #inst \"2017-09-01T07:03:48.978-00:00\" 13194139534601 true] #datom[17592186045655 70 7 13194139534601 false] #datom[13194139534601 62 \"remove incorrect assertion\" 13194139534601 true]]"}],"value":"[:tx-data [#datom[13194139534601 50 #inst \"2017-09-01T07:03:48.978-00:00\" 13194139534601 true] #datom[17592186045655 70 7 13194139534601 false] #datom[13194139534601 62 \"remove incorrect assertion\" 13194139534601 true]]]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:tempids</span>","value":":tempids"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-string'>&quot;datomic.tx&quot;</span>","value":"\"datomic.tx\""},{"type":"html","content":"<span class='clj-long'>13194139534601</span>","value":"13194139534601"}],"value":"[\"datomic.tx\" 13194139534601]"}],"value":"{\"datomic.tx\" 13194139534601}"}],"value":"[:tempids {\"datomic.tx\" 13194139534601}]"}],"value":"{:db-before {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1288, :next-t 1289, :history false}, :db-after {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1289, :next-t 1290, :history false}, :tx-data [#datom[13194139534601 50 #inst \"2017-09-01T07:03:48.978-00:00\" 13194139534601 true] #datom[17592186045655 70 7 13194139534601 false] #datom[13194139534601 62 \"remove incorrect assertion\" 13194139534601 true]], :tempids {\"datomic.tx\" 13194139534601}}"}
+;; <=
+
+;; **
+;;; * Implicit Retract: *fix a value by asserting the correct value*
+;; **
+
+;; @@
+(<!! (client/transact
+       conn
+       {:tx-data [[:db/add [:inv/sku "SKU-42"] :inv/count 1000]
+                  [:db/add "datomic.tx" :db/doc "correct data entry error"]]}))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:db-before</span>","value":":db-before"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:database-id</span>","value":":database-id"},{"type":"html","content":"<span class='clj-string'>&quot;59a7a209-5623-4172-90c1-f81af1de1cd8&quot;</span>","value":"\"59a7a209-5623-4172-90c1-f81af1de1cd8\""}],"value":"[:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\"]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:t</span>","value":":t"},{"type":"html","content":"<span class='clj-long'>1289</span>","value":"1289"}],"value":"[:t 1289]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:next-t</span>","value":":next-t"},{"type":"html","content":"<span class='clj-long'>1290</span>","value":"1290"}],"value":"[:next-t 1290]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:history</span>","value":":history"},{"type":"html","content":"<span class='clj-unkown'>false</span>","value":"false"}],"value":"[:history false]"}],"value":"{:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1289, :next-t 1290, :history false}"}],"value":"[:db-before {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1289, :next-t 1290, :history false}]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:db-after</span>","value":":db-after"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:database-id</span>","value":":database-id"},{"type":"html","content":"<span class='clj-string'>&quot;59a7a209-5623-4172-90c1-f81af1de1cd8&quot;</span>","value":"\"59a7a209-5623-4172-90c1-f81af1de1cd8\""}],"value":"[:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\"]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:t</span>","value":":t"},{"type":"html","content":"<span class='clj-long'>1290</span>","value":"1290"}],"value":"[:t 1290]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:next-t</span>","value":":next-t"},{"type":"html","content":"<span class='clj-long'>1291</span>","value":"1291"}],"value":"[:next-t 1291]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:history</span>","value":":history"},{"type":"html","content":"<span class='clj-unkown'>false</span>","value":"false"}],"value":"[:history false]"}],"value":"{:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1290, :next-t 1291, :history false}"}],"value":"[:db-after {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1290, :next-t 1291, :history false}]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:tx-data</span>","value":":tx-data"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-unkown'>#datom[13194139534602 50 #inst &quot;2017-09-01T07:13:55.677-00:00&quot; 13194139534602 true]</span>","value":"#datom[13194139534602 50 #inst \"2017-09-01T07:13:55.677-00:00\" 13194139534602 true]"},{"type":"html","content":"<span class='clj-unkown'>#datom[17592186045675 70 1000 13194139534602 true]</span>","value":"#datom[17592186045675 70 1000 13194139534602 true]"},{"type":"html","content":"<span class='clj-unkown'>#datom[17592186045675 70 100 13194139534602 false]</span>","value":"#datom[17592186045675 70 100 13194139534602 false]"},{"type":"html","content":"<span class='clj-unkown'>#datom[13194139534602 62 &quot;correct data entry error&quot; 13194139534602 true]</span>","value":"#datom[13194139534602 62 \"correct data entry error\" 13194139534602 true]"}],"value":"[#datom[13194139534602 50 #inst \"2017-09-01T07:13:55.677-00:00\" 13194139534602 true] #datom[17592186045675 70 1000 13194139534602 true] #datom[17592186045675 70 100 13194139534602 false] #datom[13194139534602 62 \"correct data entry error\" 13194139534602 true]]"}],"value":"[:tx-data [#datom[13194139534602 50 #inst \"2017-09-01T07:13:55.677-00:00\" 13194139534602 true] #datom[17592186045675 70 1000 13194139534602 true] #datom[17592186045675 70 100 13194139534602 false] #datom[13194139534602 62 \"correct data entry error\" 13194139534602 true]]]"},{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:tempids</span>","value":":tempids"},{"type":"list-like","open":"<span class='clj-map'>{</span>","close":"<span class='clj-map'>}</span>","separator":", ","items":[{"type":"list-like","open":"","close":"","separator":" ","items":[{"type":"html","content":"<span class='clj-string'>&quot;datomic.tx&quot;</span>","value":"\"datomic.tx\""},{"type":"html","content":"<span class='clj-long'>13194139534602</span>","value":"13194139534602"}],"value":"[\"datomic.tx\" 13194139534602]"}],"value":"{\"datomic.tx\" 13194139534602}"}],"value":"[:tempids {\"datomic.tx\" 13194139534602}]"}],"value":"{:db-before {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1289, :next-t 1290, :history false}, :db-after {:database-id \"59a7a209-5623-4172-90c1-f81af1de1cd8\", :t 1290, :next-t 1291, :history false}, :tx-data [#datom[13194139534602 50 #inst \"2017-09-01T07:13:55.677-00:00\" 13194139534602 true] #datom[17592186045675 70 1000 13194139534602 true] #datom[17592186045675 70 100 13194139534602 false] #datom[13194139534602 62 \"correct data entry error\" 13194139534602 true]], :tempids {\"datomic.tx\" 13194139534602}}"}
+;; <=
+
+;; **
+;;; * Look only at the most recent database value
+;; **
+
+;; @@
+(def db (client/db conn))
+
+(<!! (client/q
+       conn
+       {:query '[:find ?sku ?count
+                 :where
+                 [?inv :inv/sku ?sku]
+                 [?inv :inv/count ?count]]
+        :args [db]}))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-string'>&quot;SKU-42&quot;</span>","value":"\"SKU-42\""},{"type":"html","content":"<span class='clj-long'>1000</span>","value":"1000"}],"value":"[\"SKU-42\" 1000]"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-string'>&quot;SKU-21&quot;</span>","value":"\"SKU-21\""},{"type":"html","content":"<span class='clj-long'>7</span>","value":"7"}],"value":"[\"SKU-21\" 7]"}],"value":"[[\"SKU-42\" 1000] [\"SKU-21\" 7]]"}
+;; <=
+
 ;; @@
 
 ;; @@
